@@ -1,0 +1,3607 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\begin_preamble
+\usepackage{footnote} 
+\makesavenoteenv{tabular} 
+\end_preamble
+\use_default_options false
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref true
+\pdf_title "Fledge Message Serialization"
+\pdf_author "Tom Gibara"
+\pdf_subject "Binary message encoding"
+\pdf_bookmarks true
+\pdf_bookmarksnumbered false
+\pdf_bookmarksopen false
+\pdf_bookmarksopenlevel 1
+\pdf_breaklinks false
+\pdf_pdfborder false
+\pdf_colorlinks false
+\pdf_backref false
+\pdf_pdfusetitle true
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 0
+\use_mhchem 0
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Fledge Message Serialization (fifth draft)
+\end_layout
+
+\begin_layout Author
+Tom Gibara
+\end_layout
+
+\begin_layout Date
+May 2007, revised June 2008, March 2012, February 2014, March 2015
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+This document defines a binary message encoding.
+ It has been designed to (in order of priority):
+\end_layout
+
+\begin_layout Enumerate
+provide a compact representation of an encoded message
+\end_layout
+
+\begin_layout Enumerate
+permit efficient implementation
+\end_layout
+
+\begin_layout Enumerate
+be aligned with the type systems of popular computer languages
+\end_layout
+
+\begin_layout Enumerate
+allow a degree of extensibility within established vocabularies.
+\end_layout
+
+\begin_layout Section
+Overview
+\end_layout
+
+\begin_layout Standard
+This document specifies a general purpose message encoding that generates
+ a byte-aligned serialization of structured data.
+ For the purpose of this specification all messages are assumed to be sent
+ by a single 
+\emph on
+transmitter
+\emph default
+ to a single 
+\emph on
+receiver
+\emph default
+.
+ In practice this may not be the case; a message might be forwarded via
+ multiple transmitters, or be multicast to multiple receivers, or may not
+ be transmitted at all (but simply persisted and then deserialized by the
+ same).
+ The details of how messages are transmitted are not pertinent, and such
+ considerations are firmly outside the scope of this specification.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO clean up
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Types provide the mechanism by which the structure of the transmitted data
+ is communicated to the receiver.
+ At its simplest, the type of a message consists of a single numeric id
+ which, in the context of the communication, identifies the format of the
+ message being sent.
+ At the other extreme, the sender may choose to send all of the information
+ needed to correctly read the transmitted data;
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+This message serialization format, by design, 
+\emph on
+does not
+\emph default
+ transmit the information needed to correctly interpret the transmitted
+ data in the sense of providing human-readable or object-mapping data.
+ This is expected to be done by extensions to this protocol (eg.
+ in a header), out-of-band transmissions, or otherwise pre-established.
+\end_layout
+
+\end_inset
+
+ Such transmissions are nevertheless typically very compact.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO rename representation
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The serialization is separated into a 
+\emph on
+schema
+\emph default
+ and a 
+\emph on
+representation
+\emph default
+.
+ The schema can be rich - declaring all of the fields of information that
+ are to follow, or sparse - providing nothing more than a single identifier
+ for the data structure, or something in between these two extremes.
+ The representation contains all of the typed values that comprise the message
+ data.
+ The separation of types and values enables application-level trade-offs
+ to be made that trade compactness for comprehensibility.
+\end_layout
+
+\begin_layout Standard
+This document is structured as follows:
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+In what follows, unless otherwise stated, all encodings are big-endian (that
+ is, MSB are stored first in the bit stream) and all signed values are 2's
+ complement.
+ Where values can be encoded at multiple bit lengths, the smallest number
+ of bits 
+\emph default
+must
+\emph on
+ be used.
+\end_layout
+
+\begin_layout Section
+Messages
+\end_layout
+
+\begin_layout Standard
+A message is separated into a 
+\emph on
+schema
+\emph default
+ and a 
+\emph on
+representation
+\emph default
+.
+ The representation is the message data, and the schema describes how that
+ data is structured.
+ A message will usually consist of both a schema and a representation.
+ In some cases, a message may consist of only the schema or only the representat
+ion:
+\end_layout
+
+\begin_layout Itemize
+In a context where the schema is already known to the receiver, it may be
+ omitted, and only the representation transmitted.
+\end_layout
+
+\begin_layout Itemize
+It may be intended that only the schema should be transmitted to the receiver.
+ In this case the representation may be omitted.
+\end_layout
+
+\begin_layout Standard
+A schema may reference other schemas in its definition and these are referred
+ to as 
+\emph on
+foreign
+\emph default
+ schemas.
+ In contrast, representations cannot reference other representations.
+ In other words, schemas can import types from other schemas, but representation
+s cannot import data from other representations.
+\end_layout
+
+\begin_layout Section
+Schemas
+\end_layout
+
+\begin_layout Standard
+Schemas are used to define the structure of data in a message.
+ Any number of messages can be sent using the same schema.
+ This makes schemas useful for reducing the size of transmitted messages
+ since each message that is transmitted with the same schema can omit informatio
+n about its structure.
+ It also lends opportunities to optimize the code for serializing and deserializ
+ing messages.
+\end_layout
+
+\begin_layout Standard
+Every schema has a 
+\emph on
+name
+\emph default
+ and an 
+\emph on
+identifier
+\emph default
+, these are described below.
+\end_layout
+
+\begin_layout Subsection
+Schema Names
+\end_layout
+
+\begin_layout Standard
+A schema name serves to identify a schema within applications.
+ It should be unique within a particular software context, but need not
+ be globally unique.
+ For example, an application developer may define a collection of schemas
+ for transmitting application specific data.
+ Alternatively, a collection of schemas might be defined to allow applications
+ by different developers to share data.
+ In both of these schema collections, it is recommended that the schema
+ names should be distinct, but there is no requirement that schema names
+ be identifiable across these collections.
+\end_layout
+
+\begin_layout Standard
+Schema names are short, for the purpose of efficient transmission, consisting
+ of two elements: a 
+\emph on
+moniker
+\emph default
+ and a 
+\emph on
+version
+\emph default
+.
+\end_layout
+
+\begin_layout Subsubsection
+Monikers
+\end_layout
+
+\begin_layout Standard
+A moniker consists of four characters drawn from the following subset of
+ 
+\noun on
+ASCII
+\noun default
+:
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="6">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Upper
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Lower
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Numeric
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Hyphen
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Under.
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Space
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A-Z
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a-z
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0-9
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+-
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+_
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset space ~
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A moniker must begin with an 
+\noun on
+Upper
+\noun default
+ or 
+\noun on
+Lower
+\noun default
+ and cannot exceed four characters.
+
+\noun on
+ Space
+\noun default
+s may only be used to pad a moniker which would otherwise contain fewer
+ than four characters to its full length.
+\end_layout
+
+\begin_layout Subsubsection
+Versions
+\end_layout
+
+\begin_layout Standard
+A schema version is represented by an unsigned 32 bit integer.
+ Schema authors can choose to encode version numbers in any way that suites
+ them.
+ For example, a 
+\emph on
+major
+\emph default
+.
+\emph on
+minor
+\emph default
+.
+\emph on
+build
+\emph default
+ version such as 1.3.543 might be mapped into its component bytes: 0x0103021f.
+ As an alternative example, authors may adopt a the simple versioning scheme
+ whereby each version simply increases by one: 0x00000001, 0x00000002, 0x0000000
+3, etc.
+ It is recommended that the 32 bit version number increase (strictly) monotonica
+lly with successive versions of a schema.
+\end_layout
+
+\begin_layout Subsection
+Schema Identifiers
+\end_layout
+
+\begin_layout Standard
+Every schema is identified by a globally unique URI.
+ The URI used to identify a schema must be distinct from the URI for any
+ other schema, including different versions of the same schema For this
+ reason, it's recommended that the URI used to represent a schema incorporate
+ the schema version.
+ It is also recommended that any such URI be associated with a resource
+ owned and controlled by the schema author.
+\end_layout
+
+\begin_layout Standard
+Identifying URIs are represented in ASCII.
+ Non-ASCII characters are encoded using percent-encoding over UTF-8.
+ Two identifying URIs are considered equal if their ASCII character representati
+ons are identical.
+ The identifying URI may not exceed 2048 characters.
+\end_layout
+
+\begin_layout Standard
+Receivers may attempt to resolve schema definitions for schemas identified
+ by URLs that use commonly supported schemes
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Schemes that are commonly supported by receivers include http and https.
+\end_layout
+
+\end_inset
+
+.
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO Elaborate on this
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Schema Encoding
+\end_layout
+
+\begin_layout Standard
+A schema may be serialized in one of three ways: by 
+\emph on
+declaration
+\emph default
+, 
+\emph on
+reference
+\emph default
+ or 
+\emph on
+definition
+\emph default
+.
+ The mode
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+Need a better word than mode
+\end_layout
+
+\end_inset
+
+ of serialization used is the choice of the transmitter
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+,specifically...
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+A 
+\emph on
+declaration
+\emph default
+ has the most compact serialization and can be sent when a transmitter is
+ confident that the receiver already knows the definition of the schema.
+\end_layout
+
+\begin_layout Standard
+A 
+\emph on
+reference
+\emph default
+ extends a declaration to include the identifying URI for the schema.
+ References might be sent in situations where resolution of the schema definitio
+n is delegated to the receiver in preference to being supplied by the transmitte
+r.
+\end_layout
+
+\begin_layout Standard
+A 
+\emph on
+definition
+\emph default
+ combines a reference for the schema with a complete description of its
+ types.
+\end_layout
+
+\begin_layout Subsection
+Schema Declarations
+\end_layout
+
+\begin_layout Standard
+A declaration pairs a schema's moniker with its version.
+ It is a direct encoding of the schema name and is serialized in 8 bytes.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="3" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Bytes
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Content
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+the ASCII encoded schema moniker (padded with spaces as necessary)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a 32 bit unsigned integer that defines the schema version
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Schema References
+\end_layout
+
+\begin_layout Standard
+A reference couples a schema name with its identifying URI to provide a
+ globally unique schema identity.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="4" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Bytes
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Content
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+8
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+the schema name, serialized as per a declaration
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+the length (
+\emph on
+len
+\emph default
+) of the ASCII encoded URI encoded as two bytes 111110xx xxxxxxxx.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\emph on
+len
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+the ASCII encoded identifying URI.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Schema Definitions
+\end_layout
+
+\begin_layout Standard
+A definition combines a reference for the schema with a complete description
+ of its types.
+ The types are supplied in a list.
+ The last type in the list is considered to be the type of the representation.
+\end_layout
+
+\begin_layout Standard
+1000aabb
+\end_layout
+
+\begin_layout Standard
+aa indicates length/presence of schema
+\end_layout
+
+\begin_layout Standard
+bb indicates length/presence of value
+\end_layout
+
+\begin_layout Standard
+00 absent
+\end_layout
+
+\begin_layout Standard
+01 U8 length
+\end_layout
+
+\begin_layout Standard
+10 U16 length
+\end_layout
+
+\begin_layout Standard
+11 U32 length
+\end_layout
+
+\begin_layout Standard
+Unknown lengths are specified by a zero length.
+ A schema cannot have an unknown length in the presence of a message 
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Guaranteed availability of the schema length means that the schema can be
+ skipped if already known.
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO improve
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Types"
+
+\end_inset
+
+Types
+\end_layout
+
+\begin_layout Standard
+Conceptually, just one type of value (the type of the message) is serialized
+ for transmission but this type will commonly be defined in terms of other
+ less complex types.
+ As a result, a schema will usually define multiple types.
+\end_layout
+
+\begin_layout Subsection
+Kinds of Type
+\end_layout
+
+\begin_layout Standard
+All values are assigned some type of which there are four kinds:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Atomic
+\noun default
+ A fundamental type not defined in reference to any other type.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Logical
+\noun default
+ A type defined in meta-relation to other types.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Algebraic 
+\noun default
+A type created by combining other types.
+\end_layout
+
+\begin_layout Subsection
+Atomic Types
+\end_layout
+
+\begin_layout Standard
+Atoms are the building-blocks of encoding.
+ They have been chosen to provide a superset of the primitive types of most
+ languages.
+ 
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Consideration is being given to providing support for arbitrary precision
+ numbers (
+\family typewriter
+BigInteger
+\family default
+ and 
+\family typewriter
+BigDecimal
+\family default
+).
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+U8
+\noun default
+ An 8 bit unsigned value, 0 to 255
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+I8
+\noun default
+ An 8 bit signed value, -128 to 127
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+U16
+\noun default
+ A 16 bit unsigned value, 0 to 65535
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+I16
+\noun default
+ A 16 bit signed value, -32768 to 32767
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+U32
+\noun default
+ A 32 bit unsigned value, 0 to 4294967295
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+I32
+\noun default
+ A 32 bit signed value, -2147483648 to 2147483647
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+U64
+\noun default
+ A 64 bit unsigned value, 0 to 18446744073709551615
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+I64
+\noun default
+ A 64 bit signed value, -9223372036854775808 to 9223372036854775807
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Char 
+\noun default
+A Unicode code point
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Bool
+\noun default
+ Two values: 
+\emph on
+true
+\emph default
+ and 
+\emph on
+false
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+F32
+\noun default
+ An IEEE 32 bit float (including Inf and NaN representations)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+F64
+\noun default
+ An IEEE 64 bit float (including Inf and NaN representations)
+\end_layout
+
+\begin_layout Subsection
+Logical Types
+\end_layout
+
+\begin_layout Standard
+There are two logical types:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Void 
+\noun default
+A type which has no value.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Unbounded 
+\noun default
+Can adopt a value of any public type.
+\end_layout
+
+\begin_layout Subsubsection
+Void Types
+\end_layout
+
+\begin_layout Standard
+The void type is used to indicate the absence of a value.
+ It is typically used in Union types (see 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sub:Union-Types"
+
+\end_inset
+
+) to encode 'nullable' values.
+ It can also be aliased to create enumeration types and ADTs.
+\end_layout
+
+\begin_layout Subsubsection
+Unbounded Types
+\end_layout
+
+\begin_layout Standard
+Values with an unbounded type can span any public type.
+\end_layout
+
+\begin_layout Subsection
+Algebraic Types
+\end_layout
+
+\begin_layout Standard
+There are five algebraic types:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Array
+\noun default
+ A fixed multiplicity of some other type.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Tuple
+\noun default
+ The product of two or more other types.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Union
+\noun default
+ A choice between two or more other types.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+List
+\noun default
+ An implicitly ordered collection of values of some other type.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Alias 
+\noun default
+Defined to have an identical structure to some other type.
+\end_layout
+
+\begin_layout Subsubsection
+Array Types
+\end_layout
+
+\begin_layout Standard
+Array types are used declare values that consist of fixed multiplicity of
+ values of a single fixed type.
+ An array type is determined by the essential type and its quantity.
+\end_layout
+
+\begin_layout Subsubsection
+Tuple Types
+\end_layout
+
+\begin_layout Standard
+Tuple types are used declare values that consist of some number of components,
+ each of which are typed values.
+ A tuple type is determined by a list of types.
+ There is no restriction on the types which may be contained in this list;
+ the same type may appear multiple times and at any position.
+ The list may not be empty.
+\end_layout
+
+\begin_layout Subsubsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Union-Types"
+
+\end_inset
+
+Union Types
+\end_layout
+
+\begin_layout Standard
+Union types are used to declare that a value may adopt any one of a number
+ of types.
+ A union type is determined by a set of types.
+ There is no restriction on the types which may be contained in this set;
+ naturally a given type may only appear once.
+ The set may not be empty.
+\end_layout
+
+\begin_layout Subsubsection
+List Types
+\end_layout
+
+\begin_layout Standard
+List types are used to declare values that consist of a un-predetermined
+ multiplicity of other values.
+ All lists are homogenous, meaning that a single list can only contain values
+ of a single type, though in most contexts union types can be used to overcome
+ this restriction.
+ A list type is fully determined by the type over which it forms multiplicities,
+ on which there are no restrictions.
+ Constraints cannot be imposed on the length of lists.
+\end_layout
+
+\begin_layout Subsubsection
+Alias Types
+\end_layout
+
+\begin_layout Standard
+Alias types are defined by reference to a single other type.
+ An alias type is structurally identical to the type that defines it, the
+ only difference between them being the type identifier.
+ An alias may be 
+\emph on
+local
+\emph default
+ or 
+\emph on
+foreign
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Local A local alias references a type that is defined in the same schema.
+\end_layout
+
+\begin_layout Description
+Foreign A foreign alias references a type that is defined in a different
+ schema.
+\end_layout
+
+\begin_layout Section
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Type-Encoding"
+
+\end_inset
+
+Type Encoding
+\end_layout
+
+\begin_layout Standard
+Each type is written in 
+\begin_inset Quotes eld
+\end_inset
+
+structural order
+\begin_inset Quotes erd
+\end_inset
+
+.
+ This is the natural ordering of types that arises from structural recursion
+ on the type.
+\end_layout
+
+\begin_layout Standard
+A type encoding is segmented into two parts, an 
+\emph on
+identifier
+\emph default
+ and a 
+\emph on
+definition
+\emph default
+.
+ Atomic and logical types are wholly specified by their identifier, but
+ an algebraic type also requires a definition on its first instance in a
+ schema.
+\end_layout
+
+\begin_layout Subsection
+Type Identifiers
+\end_layout
+
+\begin_layout Standard
+A type identifier consists of a unique type 
+\emph on
+code
+\emph default
+ that is prefixed by a binary sequence to indicate the 
+\emph on
+kind
+\emph default
+ of the type.
+\end_layout
+
+\begin_layout Enumerate
+The type 
+\emph on
+kind
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+This specifies the kind of the type being encoded.
+ In the case of 
+\noun on
+atomic
+\noun default
+ and 
+\noun on
+logical
+\noun default
+ types, a type code is incorporated which completely specifies the type;
+ no further information is required.
+ For 
+\noun on
+algebraic
+\noun default
+ types, the kind incorporates information about the presence and the size
+ of the type code; this allows the code to be compactly encoded.
+ Sufficiently short codes can be completely encoded within the type kind.
+\end_layout
+
+\end_deeper
+\begin_layout Enumerate
+The type 
+\emph on
+code
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+The type codes for both 
+\noun on
+atomic
+\noun default
+ and 
+\noun on
+logical
+\noun default
+ types are specified in this document in 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "sub:Type-Codes"
+
+\end_inset
+
+.
+ Type codes for 
+\noun on
+algebraic
+\noun default
+ types are specified by the schema.
+ There are two families of identifiers: 
+\emph on
+public codes
+\emph default
+ allow receivers to recognize and process types, 
+\emph on
+synthetic codes
+\emph default
+ allow types to be referenced within a schema.
+ Some 
+\noun on
+algebraic
+\noun default
+ types may be 
+\emph on
+anonymous
+\emph default
+, having no code.
+\end_layout
+
+\end_deeper
+\begin_layout Subsubsection
+Type Kinds
+\end_layout
+
+\begin_layout Standard
+The first byte of any type identifier contains a prefix that identifies
+ the kind of the type.
+ The prefix also encodes information about the bit length of public identifiers.
+ This is important for providing compact encodings without constraining
+ the length of public type codes; in most cases, the prefix and code fit
+ into a single byte.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+\begin_inset Tabular
+<lyxtabular version="3" rows="10" columns="2">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="5cm">
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Prefix
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Indication
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0xxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A public type code with an id not exceeding 
+\begin_inset Formula $2^{7}-1$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10xxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A public type code with an id not exceeding 
+\begin_inset Formula $2^{14}-1$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+110xxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A synthetic type code with an id not exceeding 
+\begin_inset Formula $2^{21}-1$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1110yyyy
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+An atomic type code.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\emph on
+11110\SpecialChar \ldots{}
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\emph on
+reserved
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+
+\emph on
+Probably used to extend the number of supportable atomic types.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\emph on
+111110yy
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A logical type code
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1111110z
+\begin_inset space ~
+\end_inset
+
+followed
+\begin_inset space ~
+\end_inset
+
+by
+\begin_inset space ~
+\end_inset
+
+4
+\begin_inset space ~
+\end_inset
+
+or
+\begin_inset space ~
+\end_inset
+
+8
+\begin_inset space ~
+\end_inset
+
+bytes
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A public type code with an id not exceeding 
+\begin_inset Formula $2^{32}-1$
+\end_inset
+
+(
+\begin_inset Formula $z=0$
+\end_inset
+
+) or 
+\begin_inset Formula $2^{64}-1$
+\end_inset
+
+(
+\begin_inset Formula $z=1$
+\end_inset
+
+)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11111110
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+An anonymous algebraic type.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11111111
+\begin_inset space ~
+\end_inset
+
+
+\begin_inset Formula $n$
+\end_inset
+
+
+\begin_inset space ~
+\end_inset
+
+followed
+\begin_inset space ~
+\end_inset
+
+by
+\begin_inset space ~
+\end_inset
+
+
+\begin_inset Formula $n$
+\end_inset
+
+
+\begin_inset space ~
+\end_inset
+
+bytes
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+The number of all-1-bit bytes indicates the number of bytes across which
+ 
+\begin_inset Formula $n$
+\end_inset
+
+ must be read.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+A public type code with an arbitrarily large 
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+This actually limits public ids to a maximum of 
+\begin_inset Formula $2^{2048}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+ id.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+Type Codes
+\end_layout
+
+\begin_layout Standard
+All type codes are non-negative whole numbers.
+ 
+\end_layout
+
+\begin_layout Paragraph
+Atomic Type Codes
+\end_layout
+
+\begin_layout Standard
+Every atomic type has a fixed code associated with it.
+ These are:
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="12">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U8
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+I8
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U16
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+I16
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+I32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+U64
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+I64
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Char
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+F32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+F64
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+2
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+3
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+4
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+5
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+6
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+7
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+8
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+9
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Paragraph
+Logical Type Codes
+\end_layout
+
+\begin_layout Standard
+There are only two logical types, and thus two logical type codes:
+\end_layout
+
+\begin_layout Standard
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top" width="0">
+<column alignment="center" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Void
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Unb.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Paragraph
+Public Type Codes
+\end_layout
+
+\begin_layout Standard
+Public codes are supplied by the transmitting application and can be used
+ by the receiving application to distinguish known types
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Public type identifiers are generally used to direct deserialization by
+ the receiver
+\end_layout
+
+\end_inset
+
+.
+ Public codes may also be used to identify the types in definitions of other
+ types.
+ Public codes may only be used to identify 
+\noun on
+algebraic
+\noun default
+ types
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+In situations where an 
+\noun on
+atomic
+\noun default
+ or 
+\noun on
+logical
+\noun default
+ type requires an identity it may be aliased to form a new 
+\noun on
+algebraic
+\noun default
+ type
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+There is no limit imposed on the size of public codes, but practical limits
+ may exist.
+ All implementations must support public codes up to 
+\begin_inset Formula $2^{160}-1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Paragraph
+Synthetic Type Codes
+\end_layout
+
+\begin_layout Standard
+Types that are used to encode data within a message, but which are not explicitl
+y recognized by the communicating applications, are referred to as 
+\emph on
+synthetic
+\emph default
+ types.
+ Such types are allocated logically distinct codes which are not generally
+ considered to be under application scope and should only be used to identify
+ types 
+\emph on
+within
+\emph default
+ a schema and not to an application.
+\end_layout
+
+\begin_layout Standard
+Synthetic types must have a code if they are referenced in the definition
+ of another type.
+ A code is strictly optional for all other synthetic types since they serve
+ no practical purpose.
+ Synthetic types without codes are encoded anonymously.
+\end_layout
+
+\begin_layout Standard
+Synthetic codes cannot exceed 
+\begin_inset Formula $2^{21}-1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+Type Definitions
+\end_layout
+
+\begin_layout Standard
+A type definition is only required for algebraic types that have not been
+ previously defined within the schema.
+ Definitions include two elements: an 
+\emph on
+algebra
+\emph default
+ and its 
+\emph on
+component types
+\emph default
+.
+\end_layout
+
+\begin_layout Enumerate
+The type 
+\emph on
+algebra
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+A type algebra defines the structure of the type and the number of component
+ types.
+\end_layout
+
+\end_deeper
+\begin_layout Enumerate
+The type 
+\emph on
+components
+\end_layout
+
+\begin_deeper
+\begin_layout Standard
+The type algebra is always followed by a definition which specifies one
+ or more component types for the algebra.
+\end_layout
+
+\end_deeper
+\begin_layout Subsubsection
+Type Algebras
+\end_layout
+
+\begin_layout Standard
+The definition of an algebraic type must include its algebra.
+ Since tuple and union types are defined with a fixed number of component
+ types, both the algebra and the component-type multiplicity are recorded
+ using an algebra indicator which combines a prefix (that identifies the
+ kind) with a suffix for tuples and unions (that identifies the cardinality).
+ For most tupes and unions the prefix and suffix can be accommodated in
+ one byte.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="10" columns="2">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Prefix
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Indication
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0xxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+an array up to length 
+\begin_inset Formula $2^{7}$
+\end_inset
+
+ 
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10xxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a tuple with up to 
+\begin_inset Formula $2^{6}$
+\end_inset
+
+ fields
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+110xxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a union over at most 
+\begin_inset Formula $2^{5}$
+\end_inset
+
+ types
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1110xxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+an array up to length 
+\begin_inset Formula $2^{12}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11110xxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a tuple with up to 
+\begin_inset Formula $2^{11}$
+\end_inset
+
+ fields
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+111110xx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a union over at most 
+\begin_inset Formula $2^{10}$
+\end_inset
+
+ types
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1111110x
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a local 
+\begin_inset Formula $(z=0)$
+\end_inset
+
+ or foreign 
+\begin_inset Formula $(z=1)$
+\end_inset
+
+ alias
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11111110
+\begin_inset space ~
+\end_inset
+
+
+\emph on
+3
+\begin_inset space ~
+\end_inset
+
+bytes
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+an array up to length 
+\begin_inset Formula $2^{24}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+11111111
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+a list
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsubsection
+Type Components 
+\end_layout
+
+\begin_layout Standard
+The number of type components in a type definition is known unambiguously
+ from the algebra.
+ In the case of a list or array or alias, a single type follows the algebra;
+ for unions and tuples, one type is encoded for each field or option.
+ These types will be encoded using only an identifier, unless the type is
+ a previously undefined algebraic type, in which case the encoding will
+ include a definition.
+ Note that partially defined types are encoded by identifier only.
+ This enables the encoding of recursive types.
+\end_layout
+
+\begin_layout Standard
+Foreign alias types are a special case.
+ The component type is prefixed by either a schema reference or a foreign
+ schema index.
+ A schema reference specifies the schema in which the component should be
+ evaluated.
+ Each schema reference that occurs in this way is allocated an index, referred
+ it as a foreign schema index.
+ These are allocated sequentially starting at zero.
+ A foreign schema index replaces any later reference to the foreign schema.
+ Indexes are encoded in the remaining bits of a single byte value with its
+ MSB set.
+ Consequently a schema can reference at most 
+\begin_inset Formula $2^{7}$
+\end_inset
+
+ foreign schemas in its definition
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Since a schema reference begins with an ASCII character but a schema index
+ is always encoded with its high-bit set, the two alternative encodings
+ are always distinguishable
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Section
+Value Encoding
+\end_layout
+
+\begin_layout Subsection
+Atomic Type Values
+\end_layout
+
+\begin_layout Standard
+Atomic values are encoded as per their type.
+ The signed integers (
+\noun on
+I8
+\noun default
+, 
+\noun on
+I16
+\noun default
+, 
+\noun on
+I32
+\noun default
+, 
+\noun on
+I64
+\noun default
+) are encoded as regular binary values.
+ The unsigned integers (
+\noun on
+U8
+\noun default
+, 
+\noun on
+U16
+\noun default
+, 
+\noun on
+U32
+\noun default
+, 
+\noun on
+U64
+\noun default
+) are encoded as 2's complement binary values.
+ Further to these:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Char
+\noun default
+ is encoded as an 8/16/32 bit UTF-8 value
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+Bool
+\noun default
+ is encoded as 8 bit value: 0 (
+\emph on
+false
+\emph default
+) or -1 (
+\emph on
+true
+\emph default
+)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+F_32
+\noun default
+ is encoded as a IEEE 32 bit float
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\noun on
+F_64
+\noun default
+ is encoded as an IEEE 64 bit float
+\end_layout
+
+\begin_layout Subsection
+Logical Type Values
+\end_layout
+
+\begin_layout Subsubsection
+Voids
+\end_layout
+
+\begin_layout Standard
+Voids do not contain an data and so no data needs to be encoded.
+\end_layout
+
+\begin_layout Subsubsection
+Unbounded
+\end_layout
+
+\begin_layout Standard
+Unbounded values can be of any public type, so they are encoded as a public
+ type id followed by value data for that type.
+\end_layout
+
+\begin_layout Subsection
+Algebraic Type Values
+\end_layout
+
+\begin_layout Subsubsection
+Arrays
+\end_layout
+
+\begin_layout Standard
+Arrays consist of a fixed number of values of a single type and the encoding
+ of an array consists of that number of encoded values.
+\end_layout
+
+\begin_layout Subsubsection
+Tuples
+\end_layout
+
+\begin_layout Standard
+Tuples consist of a fixed number of fields, any combination of which may
+ be null.
+ The encoding defined in this document 
+\emph on
+does not
+\emph default
+ provide anything like a labelled tuple (a record or object).
+ The organisation of record or object fields into an unambiguous list of
+ fields is expected to be performed as part of the language specific mapping
+ performed during encoding and decoding.
+\end_layout
+
+\begin_layout Standard
+Tuple values are recorded in two parts.
+ A list of values, one for each element of the tuple, is preceeded by a
+ packed bit array
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+The bit array is is padded with zeros to make its length divisible by 8.
+ The MSB corresponds to first field.
+\end_layout
+
+\end_inset
+
+ in which each bit indicates whether the corresponding field is null.
+ This array is referred to as the 
+\emph on
+nullary
+\emph default
+.
+ Only non-null values follow the nullary.
+ Because null fields are associated with tuples only, collections and atoms
+ cannot by themselves encode null values.
+\end_layout
+
+\begin_layout Subsubsection
+Unions
+\end_layout
+
+\begin_layout Standard
+A union consists of a single value of one of the types declared in the union.
+ Consequently, a union is encoded as a type id followed by the value data.
+\end_layout
+
+\begin_layout Subsubsection
+Lists
+\end_layout
+
+\begin_layout Standard
+The lengths of a lists are encoded using variable byte lengths according
+ to the binary pattern given below.
+ The intention is to ensure that short lists are encoded efficiently without
+ unecessarily constraining the greatest possible lengths.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+0xxxxxxx One byte for lengths expressible in no more than 7 bits.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+10xxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx Two bytes for lengths expressible in no more that 14 bits
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+110xxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx Three bytes for lengths expressible in no more that 21 bits
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+1110xxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxx
+\begin_inset space ~
+\end_inset
+
+xxxxxxxxx Four bytes for lengths expressible in no more that 28 bits
+\end_layout
+
+\begin_layout Standard
+It follows that the maximum length of any list is 
+\begin_inset Formula $2^{28}-1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+A 
+\noun on
+List
+\noun default
+ is encoded as length followed by element data.
+ There is no restriction on lists that requires unique values.
+ Where lists are used to encode sets it is the responsibility of the encoder/dec
+oder to ensure that such constraints are met.
+\end_layout
+
+\begin_layout Subsubsection
+Alias Values
+\end_layout
+
+\begin_layout Standard
+The value is encoded identically to the that of the aliased type.
+ In the case of a foreign alias, this value is prefixed by a byte containing
+ the index of the foreign schema.
+\end_layout
+
+\begin_layout Section
+Message Encoding
+\end_layout
+
+\begin_layout Standard
+Every message is assumed to be in the context of a vocabulary that has been
+ established external to the message.
+ In this context, each message encoding consists of two parts:
+\end_layout
+
+\begin_layout Enumerate
+a type
+\begin_inset Newline newline
+\end_inset
+
+The type is written in 
+\begin_inset Quotes eld
+\end_inset
+
+structural order
+\begin_inset Quotes erd
+\end_inset
+
+.
+ This is the natural ordering of fields that arises from structural recursion
+ on the type.
+\end_layout
+
+\begin_layout Enumerate
+a realization
+\begin_inset Newline newline
+\end_inset
+
+The realization of a type consists of values in the structural order of
+ that type.
+\end_layout
+
+\begin_layout Section
+Schema compatibility
+\end_layout
+
+\begin_layout Standard
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Notes here about conditions under which schemas are compatible (particularly
+ in relation to how schemas can be evolved compatibility between versions).
+\end_layout
+
+\begin_layout Section
+Language Mappings
+\end_layout
+
+\begin_layout Subsection
+Java Mapping
+\end_layout
+
+\begin_layout Standard
+Atomic values are naturally mapped to their corresponding Java types (primitives
+ in most cases).
+ The atomic tuples also have a standard representation the type system.
+ This is summarized in the table below.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="9" columns="3">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Atomic Type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Java Type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Java Type (tuplized)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U8
+\noun default
+ and 
+\noun on
+I8
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+byte
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Byte
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U16
+\noun default
+ and 
+\noun on
+I16
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+short
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Short
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U32
+\noun default
+ and 
+\noun on
+I32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Integer
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+U64
+\noun default
+ and 
+\noun on
+I64
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+long
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Long
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Char
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+char
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Character
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+boolean
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Boolean
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+F32
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+float
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Float
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+F64
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+double
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Double
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+All Java collection types are encoded using 
+\noun on
+List
+\noun default
+.
+ Java arrays provide the default representation for decoding 
+\noun on
+Array
+\noun default
+ values.
+ The default representation of a tuple is a Java object array.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="5" columns="3">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<column alignment="left" valignment="top" width="0">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Java Type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Algebraic Type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+default target Java Type
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+\emph on
+java array
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Array
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+\emph on
+java array*
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+???
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Tuple
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.lang.Object[]
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+Union
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+\begin_inset Note Note
+status open
+
+\begin_layout Plain Layout
+TODO
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.util.Collection
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+List
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+java.util.List
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+* A 
+\family typewriter
+java.lang.String
+\family default
+ is encoded as a character array.
+\end_layout
+
+\begin_layout Section
+Future Considerations
+\end_layout
+
+\begin_layout Standard
+The following amendments and extensions are under consideration:
+\end_layout
+
+\begin_layout Itemize
+The introduction of a compact boolean array encoding.
+ Whether this is worth the additional complexity of its implementation given
+ that applications can use byte arrays is questionable.
+\end_layout
+
+\begin_layout Itemize
+Provision of a compact encoding for small numbers.
+\end_layout
+
+\begin_layout Itemize
+Support for types equivalent to Java's 
+\family typewriter
+BigInteger
+\family default
+ and 
+\family typewriter
+BigDecimal
+\family default
+ classes.
+\end_layout
+
+\begin_layout Itemize
+Reference values; that is, the ability to share repeated values in a realization.
+ This is not intended to provide object-graph semantics, but to allow for
+ efficient data transmission.
+\end_layout
+
+\begin_layout Itemize
+Allowing collection types to defer stating their size, so that collections
+ of an indeterminate size can be streamed; possibly by 'chunking'.
+\end_layout
+
+\begin_layout Itemize
+Consider approaches to restore former concept of a nullary for algebraic
+ types.
+\end_layout
+
+\begin_layout Itemize
+Consider possibility of standardized markup for defining schemas.
+\end_layout
+
+\begin_layout Section
+Document History
+\end_layout
+
+\begin_layout Itemize
+First published May 2007
+\end_layout
+
+\begin_layout Itemize
+Corrections and clarifications made June 2008
+\end_layout
+
+\begin_layout Itemize
+Major redesign motivated by union types and better type identifiers, March
+ 2012
+\end_layout
+
+\begin_layout Itemize
+Significant clarifications made to type encoding, February 2014
+\end_layout
+
+\begin_layout Itemize
+Atomic types extended and renamed, array types introduced, March 2015
+\end_layout
+
+\end_body
+\end_document
