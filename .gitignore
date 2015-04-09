@@ -6,3 +6,6 @@
 
 # lyx
 **/#*#
+
+# generated files
+/target

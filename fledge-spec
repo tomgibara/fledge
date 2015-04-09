@@ -1,0 +1,25 @@
+#!/bin/bash
+hash lyx 2>/dev/null || { echo >&2 "lyx not installed.  Aborting."; exit 1; }
+
+set -e
+BASE=`dirname "$(readlink -f "$0")"`
+
+case "$1" in
+clean) echo "Cleaning fledge specification"
+  rm -r "$BASE/target"
+  exit 0
+  ;;
+convert) echo "Converting fledge specification"
+  mkdir -p "$BASE/target"
+  cp -r "$BASE/src/lyx" "$BASE/target/"
+  lyx -e pdf "$BASE/target/lyx/fledge-specification.lyx"
+  mv "$BASE/target/lyx/fledge-specification.pdf" "$BASE/target/"
+  exit 0
+  ;;
+"") echo "Supported options are: clean, convert";
+  exit 1
+  ;;
+*) echo "Invalid option '$1' Supported options are: clean, convert";
+  exit 1
+  ;;
+esac
