@@ -1,3 +1,4 @@
+
 #!/bin/bash
 hash lyx 2>/dev/null || { echo >&2 "lyx not installed.  Aborting."; exit 1; }
 
@@ -11,9 +12,8 @@ clean) echo "Cleaning fledge specification"
   ;;
 convert) echo "Converting fledge specification"
   mkdir -p "$BASE/target"
-  cp -r "$BASE/src/lyx" "$BASE/target/"
-  lyx -e pdf "$BASE/target/lyx/fledge-specification.lyx"
-  mv "$BASE/target/lyx/fledge-specification.pdf" "$BASE/target/"
+  cp "$BASE/src/lyx/fledge-specification.lyx" "$BASE/target/"
+  lyx -e pdf "$BASE/target/fledge-specification.lyx"
   exit 0
   ;;
 "") echo "Supported options are: clean, convert";
@@ -23,3 +23,4 @@ convert) echo "Converting fledge specification"
   exit 1
   ;;
 esac
+
