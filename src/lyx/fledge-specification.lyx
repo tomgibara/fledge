@@ -1911,6 +1911,8 @@ I32
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\noun on
 U64
 \end_layout
 
@@ -1920,6 +1922,8 @@ U64
 \begin_inset Text
 
 \begin_layout Plain Layout
+
+\noun on
 I64
 \end_layout
 
@@ -1931,7 +1935,18 @@ I64
 \begin_layout Plain Layout
 
 \noun on
-Char
+F64
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\noun on
+F64
 \end_layout
 
 \end_inset
@@ -1947,20 +1962,13 @@ Bool
 
 \end_inset
 </cell>
-<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
-\begin_inset Text
-
-\begin_layout Plain Layout
-F32
-\end_layout
-
-\end_inset
-</cell>
 <cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
 \begin_layout Plain Layout
-F64
+
+\noun on
+Char
 \end_layout
 
 \end_inset
